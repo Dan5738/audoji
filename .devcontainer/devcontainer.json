@@ -1,18 +1,1 @@
-{
-    "name": "Audoji Chat App Development",
-    "dockerComposeFile": "../docker-compose-opt.yml",
-    "service": "web",
-    "workspaceFolder": "/code",
-    "settings": { 
-        "terminal.integrated.shell.linux": "/bin/bash"
-    },
-    "extensions": [
-        "ms-python.python",
-        "ms-azuretools.vscode-docker"
-    ],
-    "forwardPorts": [8000],
-    "postCreateCommand": "echo 'Consider running migrations or other setup scripts here'",
-    "shutdownAction": "stopCompose",
-    "runServices": ["web", "celery", "redis"],
-    "remoteUser": "root"
-}
+
