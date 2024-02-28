@@ -11,12 +11,13 @@ from rest_framework.views import APIView
 
 from audojiengine.logging_config import configure_logger
 from audojiengine.mg_database import store_data_to_audio_mgdb
-from audojifactory.audojifactories.opensourcefactory import (
-    AudioRetrieval as OSAudioRetrieval,
-)
+from audojifactory.audojifactories.opensourcefactory import \
+    AudioRetrieval as OSAudioRetrieval
 from audojifactory.models import AudioFile, AudioSegment, UserSelectedAudoji
-from audojifactory.serializers import AudioFileSerializer, AudioSegmentSerializer
-from audojifactory.tasks import task_run_async_db_operation, task_run_async_processor
+from audojifactory.serializers import (AudioFileSerializer,
+                                       AudioSegmentSerializer)
+from audojifactory.tasks import (task_run_async_db_operation,
+                                 task_run_async_processor)
 
 logger = configure_logger(__name__)
 
@@ -95,8 +96,9 @@ class AudioFileList(APIView):
                     # # Call the Celery task for DB operation
                     # task_run_async_db_operation.delay(data)
 
-                    # Call the Celery task for processing
-                    task_run_async_processor.delay(audio_file_instance.id, model_type)
+                    # Call the Celery task for processing and create a unique group name per user
+                    group_name = f"user_{owner_id}"
+                    task_run_async_processor.delay(audio_file_instance.id, model_type, group_name)
 
                     duration = time.time() - process_start_time
                     logger.info(f"CREATION DURATION: {duration:.2f} seconds")

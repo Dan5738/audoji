@@ -1,12 +1,13 @@
 import io
 import json
 import os
-import requests
 import tempfile
 
 import librosa
 import openai
+import requests
 from asgiref.sync import sync_to_async
+from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.files.base import ContentFile
 from openai import AsyncOpenAI
@@ -15,21 +16,33 @@ from pydub import AudioSegment as AudioSegmentCreator
 from audojiengine.logging_config import configure_logger
 from audojiengine.mg_database import store_data_to_audio_segment_mgdb
 from audojifactory.models import AudioSegment as AudioSegmentModel
+from audojifactory.serializers import AudioSegmentSerializer
 
 openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 logger = configure_logger(__name__)
 
 
 class AudioProcessor:
-    def __init__(self, audio_file_instance):
+    def __init__(self, audio_file_instance, group_name=None):
         import whisper
 
+        self.group_name = group_name
         self.audio_file_instance = audio_file_instance
         # self.audio_path = audio_file_instance.audio_file.path
         self.audio_path = audio_file_instance.audio_file.url
         self.model = whisper.load_model(
             "base"
         )  # "base", "medium", "large-v1", "large-v2", "large-v3", "large"
+
+    async def send_segment_to_group(self, segment_data):
+        channel_layer = get_channel_layer()
+        await channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "audio.segment",
+                "message": segment_data,
+            },
+        )
 
     async def transcribe_audio(self):
         return self.model.transcribe(self.audio_path)
@@ -82,17 +95,23 @@ class AudioProcessor:
                 "category": category,
             }
             audio_segment_instance = AudioSegmentModel(**segment_data)
-            
+
             await sync_to_async(audio_segment_instance.save)()
-            
+
             # ==================== Create Audoji ====================
-            create_audoji_sync = sync_to_async(AudioRetrieval(audio_segment_instance, start, end).create_audoji)
+            create_audoji_sync = sync_to_async(
+                AudioRetrieval(audio_segment_instance, start, end).create_audoji
+            )
             created_audoji = await create_audoji_sync()
 
             logger.info(f"Audoji created! {created_audoji}")
             # ==================== Create Audoji ====================
 
             segment_data["audio_file_id"] = self.audio_file_instance.id
+
+            await self.send_segment_to_group(
+                AudioSegmentSerializer(audio_segment_instance).data
+            )
 
             logger.info(
                 f"Segment {i} exported and saved: Text: {segment.get('text', '')} | Start - {segment['start']}s, End - {segment['end']}s"
@@ -134,7 +153,9 @@ class AudioRetrieval:
 
         # Extract the title of the audio file to use in the segment file name
         audio_title = self.audio_file_instance.audio_file.title
-        safe_title = "".join([c if c.isalnum() else "_" for c in audio_title])  # Create a filesystem-safe version of the title
+        safe_title = "".join(
+            [c if c.isalnum() else "_" for c in audio_title]
+        )  # Create a filesystem-safe version of the title
         segment_file_name = f"segment_{self.segment_id}.mp3"
 
         # Use the custom upload path function if needed
