@@ -9,9 +9,9 @@ from audojifactory.serializers import AudioSegmentSerializerWebSocket
 
 class AudioSegmentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Retrieve the owner_id from the query string
-        self.owner_id = self.scope["query_string"].decode("utf-8").split("=")[1]
-        self.group_name = f"user_{self.owner_id}"
+        # Retrieve the user_id from the query string
+        self.user_id = self.scope["query_string"].decode("utf-8").split("=")[1]
+        self.group_name = f"user_{self.user_id}"
 
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
